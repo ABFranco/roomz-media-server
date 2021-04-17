@@ -31,12 +31,12 @@ func main() {
   server := &rms.RoomzMediaServer{}
   server = server.Init()
 
-  go server.Server.Serve()
-  defer server.Server.Close()
+  go server.SioServer.Serve()
+  defer server.SioServer.Close()
 
   router.Use(GinMiddleware("http://localhost:3000"))
-  router.GET("/socket.io/*any", gin.WrapH(server.Server))
-  router.POST("/socket.io/*any", gin.WrapH(server.Server))
+  router.GET("/socket.io/*any", gin.WrapH(server.SioServer))
+  router.POST("/socket.io/*any", gin.WrapH(server.SioServer))
 
   log.Fatal(router.Run(":5000"))
 }
