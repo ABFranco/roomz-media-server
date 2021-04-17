@@ -5,14 +5,17 @@ import (
 )
 
 type RoomManager struct {
-  rooms map[int64] room.Room
+  rooms map[int64] *room.Room
 }
 
-func (r *RoomManager) getRoom(roomId int64) room.Room {
+func (r *RoomManager) GetRoom(roomId int64) *room.Room {
+  if _, ok := r.rooms[roomId]; !ok {
+    r.rooms[roomId] = room.NewRoom(roomId)
+  }
   return r.rooms[roomId]
 }
 
-func (r *RoomManager) deleteRoom(roomId int64) {
+func (r *RoomManager) DeleteRoom(roomId int64) {
   if _, ok := r.rooms[roomId]; ok {
     delete(r.rooms, roomId)
   }

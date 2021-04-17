@@ -1,6 +1,7 @@
 package rms
 
 import (
+  "fmt"
   "log"
 
   "github.com/ABFranco/roomz-media-server/roommgr"
@@ -44,6 +45,21 @@ func (r *RoomzMediaServer) disconnectHandler(s socketio.Conn, msg string) {
 }
 
 func (r *RoomzMediaServer) joinMediaRoomHandler(s socketio.Conn, data map[string]interface{}) {
+  log.Printf(":JoinMediaRoom: received data=%v", data)
+  _, ok := data["user_id"].(int64)
+  if !ok {
+    log.Printf("invalid user_id")
+    return
+  }
+  roomId, ok := data["room_id"].(int64)
+  if !ok {
+    log.Printf("invalid room_id")
+    return
+  }
+  // TODO: Validate token.
+  room := r.roomMgr.GetRoom(roomId)
+  mediaMgr := room.GetMediaManager()
+  fmt.Printf("room=%v, mediaMgr=%v", room, mediaMgr)
 }
 
 func (r *RoomzMediaServer) receiveMediaFromHandler(s socketio.Conn, data map[string]interface{}) {

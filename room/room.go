@@ -6,7 +6,7 @@ import (
 
 type Room struct {
   roomId   int64
-  mediaMgr mediamgr.RoomMediaManager
+  mediaMgr *mediamgr.RoomMediaManager
   roomies  []RoomUser
 }
 
@@ -15,27 +15,36 @@ type RoomUser struct {
   sId    int64
 }
 
-func (r *Room) join(userId, sId int64) {
+func NewRoom(roomId int64) *Room {
+  r := &Room{
+    roomId: roomId,
+    mediaMgr: mediamgr.NewRoomMediaManager(roomId),
+    roomies: []RoomUser{},
+  }
+  return r
+}
+
+func (r *Room) Join(userId, sId int64) {
   // TODO
 }
 
-func (r *Room) leave(userId int64) {
+func (r *Room) Leave(userId int64) {
   // TODO
 }
 
-func (r *Room) broadcastNewRoomyArrived(userId int64) {
+func (r *Room) BroadcastNewRoomyArrived(userId int64) {
   // TODO
 }
 
-func (r *Room) broadcastRoomyLeft(userId int64) {
+func (r *Room) BroadcastRoomyLeft(userId int64) {
   // TODO
 }
 
-func (r *Room) getRoomiez() []int64 {
+func (r *Room) GetRoomiez() []int64 {
   // TODO
   return []int64{}
 }
 
-func (r *Room) getMediaManager() mediamgr.RoomMediaManager {
+func (r *Room) GetMediaManager() *mediamgr.RoomMediaManager {
   return r.mediaMgr
 }
