@@ -63,7 +63,6 @@ func (r *RoomzMediaServer) joinMediaRoomHandler(s socketio.Conn, data map[string
   room.Join(userId, s.ID())
 
   log.Printf("Emitting \"NewMediaRoomyArrived\" to roomId: %v for userId: %v", roomId, userId)
-  // TODO: Pass socketio Server here?
   room.BroadcastNewRoomyArrived(r.SioServer, userId)
 
   log.Printf("Emitting \"ExistingMediaRoomiez\" to userId: %v", userId)
