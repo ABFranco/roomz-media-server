@@ -50,8 +50,8 @@ func (r *RoomMediaManager) StartBroastcast(userId int64) {
       ticker := time.NewTicker(rtcpPLIInterval)
       for range ticker.C {
         if rtcpSendErr := pc.WriteRTCP([]rtcp.Packet{&rtcp.PictureLossIndication{MediaSSRC: uint32(remoteTrack.SSRC())}}); rtcpSendErr != nil {
-					log.Printf("RTCP Send Error: %v for userId: %v", rtcpSendErr, userId)
-				}
+          log.Printf("RTCP Send Error: %v for userId: %v", rtcpSendErr, userId)
+        }
       }
     }()
 
