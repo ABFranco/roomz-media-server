@@ -2,6 +2,8 @@ package rms
 
 import (
   "log"
+  "strconv"
+  "strings"
 
   "github.com/ABFranco/roomz-media-server/roommgr"
   socketio "github.com/googollee/go-socket.io"
@@ -70,6 +72,45 @@ func (r *RoomzMediaServer) joinMediaRoomHandler(s socketio.Conn, data map[string
 }
 
 func (r *RoomzMediaServer) receiveMediaFromHandler(s socketio.Conn, data map[string]interface{}) {
+  log.Printf(":ReceiveMediaFrom: received data=%v", data)
+  fromPeerId, ok := data["from_peer_id"].(string)
+  if !ok {
+    log.Printf("invalid from_peer_id")
+    return
+  }
+  toPeerId, ok := data["to_peer_id"].(string)
+  if !ok {
+    log.Printf("invalid to_peer_id")
+    return
+  }
+  sdpOffer, ok := data["desc"].(string)
+  if !ok {
+    log.Printf("no sdpOffer")
+    return
+  }
+  roomId := strings.Split(fromPeerId, "-")[0]
+  roomId64, err := strconv.ParseInt(roomId, 10, 64)
+  if err != nil {
+    log.Printf("could not parse peer_id correctly")
+    return
+  }
+  room := r.roomMgr.GetRoom(roomId64)
+  mediaMgr := room.GetMediaManager()
+  if fromPeerId == toPeerId {
+    log.Printf("Completing broadcast for peerId: %v", fromPeerId)
+    sdpAnswer, err := mediaMgr.CompleteBroadcast(fromPeerId, sdpOffer)
+    if err != nil {
+      log.Printf("Completing broadcast failed, err=%v", err)
+    }
+    // NOTE: I'll move this chunk after the if-else after playback success.
+    r.SioServer.BroadcastToRoom("/", s.ID(), "ReceiveMediaAnswer", map[string]interface{}{
+      "fromPeerId": fromPeerId,
+      "sdp_answer": sdpAnswer,
+    })
+  } else {
+    log.Printf("peerId: %v receiving broadcast from peerId: %v", toPeerId, fromPeerId)
+    mediaMgr.RecvBroastcast(toPeerId, fromPeerId, sdpOffer)
+  }
 }
 
 func (r *RoomzMediaServer) leaveMediaRoomHandler(s socketio.Conn, data map[string]interface{}) {
