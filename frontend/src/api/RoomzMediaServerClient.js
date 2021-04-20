@@ -1,4 +1,5 @@
 
+import io from 'socket.io-client';
 // Connect to RMS
 const rmsClientSocket = io("http://localhost:5000", {
   autoConnect: false,
@@ -49,7 +50,7 @@ function awaitExistingMediaRoomiez(cb) {
   rmsClientSocket.on(events.EXISTING_MEDIA_ROOMIEZ, (resp) => {
     console.log(':sio.awaitExistingMediaRoomiez: Received response=%o', resp)
     cb(resp)
-    socket.off(events.EXISTING_MEDIA_ROOMIEZ)
+    rmsClientSocket.off(events.EXISTING_MEDIA_ROOMIEZ)
   })
 }
 
@@ -57,7 +58,7 @@ function awaitNewMediaRoomyArrived(cb) {
   rmsClientSocket.on(events.NEW_MEDIA_ROOMY_ARRIVED, (resp) => {
     console.log(':sio.awaitNewMediaRoomyArrived: Received response=%o', resp)
     cb(resp)
-    socket.off(events.NEW_MEDIA_ROOMY_ARRIVED)
+    rmsClientSocket.off(events.NEW_MEDIA_ROOMY_ARRIVED)
   })
 }
 
@@ -65,6 +66,16 @@ function awaitReceiveMediaAnswer(cb) {
   rmsClientSocket.on(events.RECEIVE_MEDIA_ANSWER, (resp) => {
     console.log(':sio.awaitReceiveMediaAnswer: Received response=%o', resp)
     cb(resp)
-    socket.off(events.RECEIVE_MEDIA_ANSWER)
+    rmsClientSocket.off(events.RECEIVE_MEDIA_ANSWER)
   })
 }
+
+export {
+  rmsClientSocket,
+  askToConnect,
+  joinMediaRoom,
+  receiveMediaFrom,
+  awaitExistingMediaRoomiez,
+  awaitNewMediaRoomyArrived,
+  awaitReceiveMediaAnswer,
+};
