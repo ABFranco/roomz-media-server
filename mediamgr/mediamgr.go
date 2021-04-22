@@ -108,12 +108,12 @@ func (r *RoomMediaManager) CompleteBroadcast(peerId, sdpOffer string) (string, e
   go func() {
     _, cancel := context.WithCancel(context.Background())
     pc.OnICEConnectionStateChange(func(connectionState webrtc.ICEConnectionState) {
-      log.Printf("peerId: %s connection state has changed: %s\n", connectionState.String())
+      log.Printf("peerId: %s connection state has changed: %s\n", peerId, connectionState.String())
       if connectionState == webrtc.ICEConnectionStateConnected {
-        log.Println("peerId: %s is connected.")
+        log.Printf("peerId: %s is connected.", peerId)
       } else if connectionState == webrtc.ICEConnectionStateFailed ||
               connectionState == webrtc.ICEConnectionStateDisconnected {
-        log.Println("peerId: %s is disconnected.")
+        log.Printf("peerId: %s is disconnected.", peerId)
         cancel()
       }
     })

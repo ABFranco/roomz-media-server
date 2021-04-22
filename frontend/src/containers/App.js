@@ -6,9 +6,10 @@ import './App.css';
 
 
 function App(props) {
-  const room_id = useRef();
-  const user_id = useRef();
-  const egress_media = useRef();
+  const roomIdRef = useRef();
+  const userIdRef = useRef();
+  const egressMediaRef = useRef();
+  const ingressMediaRef = useRef();
 
   var ICE_SERVERS = [
     {urls:"stun:stun.l.google.com:19302"}
@@ -44,7 +45,7 @@ function App(props) {
       function(stream) {
         console.log('granted access to audio/video')
         egressMediaStream = stream
-        egress_media.current.srcObject = egressMediaStream
+        egressMediaRef.current.srcObject = egressMediaStream
         if (cb) cb();
       },
       function() {
@@ -64,8 +65,8 @@ function App(props) {
   // event handlers for possible response events from the RMS.
   function joinMediaRoom() {
     // TODO: validation.
-    let roomId = room_id.current.value;
-    let userId = user_id.current.value;
+    let roomId = roomIdRef.current.value;
+    let userId = userIdRef.current.value;
     myPeerId = roomId + "-" + userId;
     let data = {
       'user_id': userId,
@@ -106,6 +107,7 @@ function App(props) {
           let fromUserId = newPeerId.split("-")[1];
           if (event.streams.length > 0 && fromUserId >= 0) {
             console.log('setting up media for userId=%o', fromUserId)
+            ingressMediaRef.current.srcObject = event.streams[0]
             // TODO: Add to grid component somehow.
             // Keep video refs for now?
           }
@@ -115,14 +117,16 @@ function App(props) {
         // connection.
         pc.onicecandidate = function(event) {
           console.log('received ICE candidate from newPeerId=%o', newPeerId)
+          console.log(event)
         }
 
         // Add an offer on the peer connection and after setting the local
         // description of the peer connection, emit the 'ReceiveMediaFrom'
         // event using the SDP.
+        console.log('creating offer..')
         pc.createOffer(
           function(localDescription) {
-            console.log('set location description for newPeerId=%o', newPeerId)
+            console.log('set local description for newPeerId=%o', newPeerId)
             pc.setLocalDescription(localDescription,
             function() {
               // With the local description, we can send the event. We will
@@ -152,6 +156,9 @@ function App(props) {
                 });
               });
             });
+          },
+          function(e) {
+            console.log('error setting local description=%o', e)
           }
         );
       });
@@ -166,7 +173,7 @@ function App(props) {
       <div className="vestibule-video-preview-ctnr">
         <div className="video" id="vestibule-video-preview">
           <label htmlFor="outgoing-vid">Vestibule Video</label><br/>
-          <video ref={egress_media} id="vestibule-vid" autoPlay controls/>
+          <video ref={egressMediaRef} id="vestibule-vid" autoPlay controls/>
         </div>
         <div className="user-actions">
           <button className="roomz-btn button-primary" onClick={setupLocalMedia}>Setup Media</button>
@@ -176,15 +183,21 @@ function App(props) {
         <form className="user-settings-form">
           <div className="user-input-form">
             <label htmlFor="room-id">Room Id: </label>
-            <input id="room-id" ref={room_id} autoFocus/>
+            <input id="room-id" ref={roomIdRef} autoFocus/>
           </div>
           <div className="user-input-form">
             <label htmlFor="user-id">User Id: </label>
-            <input id="user-id" ref={user_id} autoFocus/>
+            <input id="user-id" ref={userIdRef} autoFocus/>
           </div>
         </form>
         <div className="user-actions">
           <button className="roomz-btn button-primary" onClick={joinMediaRoom}>JoinMediaRoom</button>
+        </div>
+      </div>
+      <div className="grid-cntr">
+        <div className="video" id="ingress-media-ref">
+          <label htmlFor="incoming-vid">Ingress Video</label><br/>
+          <video ref={ingressMediaRef} id="ingress-vid" autoPlay controls/>
         </div>
       </div>
     </div>
