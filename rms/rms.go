@@ -111,21 +111,29 @@ func (r *RoomzMediaServer) receiveMediaFromHandler(s socketio.Conn, data map[str
   }
   room := r.roomMgr.GetRoom(roomId64)
   mediaMgr := room.GetMediaManager()
+  var sdpAnswer string
+
+  // If requesting to receive media from themselves, they must first complete
+  // the offer/answer process on the broadcast pc.
   if fromPeerId == toPeerId {
     log.Printf("Completing broadcast for peerId: %v", fromPeerId)
-    sdpAnswer, err := mediaMgr.CompleteBroadcast(fromPeerId, sdpOffer)
+    sdpAnswer, err = mediaMgr.CompleteBroadcast(fromPeerId, sdpOffer)
     if err != nil {
       log.Printf("Completing broadcast failed, err=%v", err)
+      return
     }
-    // NOTE: I'll move this chunk after the if-else after playback success.
-    r.SioServer.BroadcastToRoom("/", s.ID(), "ReceiveMediaAnswer", map[string]interface{}{
-      "fromPeerId": fromPeerId,
-      "sdp_answer": sdpAnswer,
-    })
-  } else {
-    log.Printf("peerId: %v receiving broadcast from peerId: %v", toPeerId, fromPeerId)
-    mediaMgr.RecvBroastcast(toPeerId, fromPeerId, sdpOffer)
   }
+  // Create a RecvBroadcast Pc and send its sdpAnswer to the RFE.
+  sdpAnswer, err = mediaMgr.RecvBroastcast(toPeerId, fromPeerId, sdpOffer)
+  if err != nil {
+    log.Printf("RecvBroadcast failed, err=%v", err)
+    return
+  }
+  r.SioServer.BroadcastToRoom("/", s.ID(), "ReceiveMediaAnswer", map[string]interface{}{
+    "fromPeerId": fromPeerId,
+    "sdp_answer": sdpAnswer,
+  })
+  log.Printf("peerId: %v receiving broadcast from peerId: %v", toPeerId, fromPeerId)
 }
 
 func (r *RoomzMediaServer) leaveMediaRoomHandler(s socketio.Conn, data map[string]interface{}) {
