@@ -61,6 +61,67 @@ function App(props) {
     })
   }
 
+  function newPeerConnection() {
+    return new RTCPeerConnection(
+      {"iceServers": ICE_SERVERS},
+      // This is needed for chrome/firefox/edge support.
+      {"optional": [{"DtlsSrtpKeyAgreement": true}]}
+    )
+  }
+
+  // completeBroadcast creates a broadcaster pc, adds the local media tracks
+  // onto the broadcaster pc, and performs the offer/answer process with the
+  // RMS. This should be called before emitting a "RecvMediaFrom" event
+  // asking to receive their own media.
+  function completeBroadcast(peerId) {
+    console.log('completing broadcast for peerId=%o', peerId)
+    let broadcastPc = newPeerConnection();
+    let tracks = egressMediaStream.getTracks()
+    for (var i = 0; i < tracks.length; i++) {
+      broadcastPc.addTrack(tracks[i], egressMediaStream)
+    }
+    
+    broadcastPc.onicecandidate = function(event) {
+      console.log('received ICE Candidate for broadcast pc for peerId=%o', peerId)
+      console.log(event)
+    }
+
+    // Store peer connection in map.
+    roomyPcs[peerId] = broadcastPc;
+
+    broadcastPc.createOffer(
+      function(localDescription) {
+        console.log('set local description for peerId=%o\'s broadcaster pc.', peerId)
+        broadcastPc.setLocalDescription(localDescription,
+        function() {
+          let data = {
+            'peer_id': peerId,
+            'desc': btoa(JSON.stringify(broadcastPc.localDescription))
+          }
+          rmsClient.completeBroadcastOffer(data, () => {
+            console.log('peerId=%o send CompleteBroadcastOffer event', peerId)
+            rmsClient.awaitCompleteBroadcastAnswer((resp) => {
+              let sdpAnswer = JSON.parse(atob(resp["sdp_answer"]));
+              if (sdpAnswer !== '') {
+                var remoteDescription = new RTCSessionDescription(sdpAnswer)
+                var tmp = broadcastPc.setRemoteDescription(remoteDescription,
+                function() {
+                  console.log('set remote description on peerId=%o\'s broadcast pc', peerId);
+                }, function (e) {
+                  console.log('error=%o setting remote description for peerId\'s broadcast pc', e, peerId)
+                })
+              }
+            })
+          })
+        })
+      },
+      function(e) {
+        console.log('error=%o setting peerId=%o\'s local description', e, peerId)
+      }
+    )
+
+  }
+
   // joinMediaRoom emits the 'JoinMediaRoom' event to the RMS and registers
   // event handlers for possible response events from the RMS.
   function joinMediaRoom() {
@@ -82,28 +143,21 @@ function App(props) {
       rmsClient.awaitNewMediaRoomyArrived((resp) => {
         console.log('new roomy arrived, resp=%o', resp)
         let newPeerId = resp["peer_id"];
+        let isBroadcaster = false;
 
         // Create a fresh peer connection.
-        let pc = new RTCPeerConnection(
-          {"iceServers": ICE_SERVERS},
-          // This is needed for chrome/firefox/edge support.
-          {"optional": [{"DtlsSrtpKeyAgreement": true}]}
-        )
+        let recvBroadcastPc = newPeerConnection()
+
         if (newPeerId === myPeerId) {
-          console.log('setting up egress tracks on my peer connection to the rms')
-          // NOTE: This requires local media to be setup. We will need to validate
-          // this in the eventual FE component.
-          let tracks = egressMediaStream.getTracks()
-          for (var i = 0; i < tracks.length; i++) {
-            pc.addTrack(tracks[i], egressMediaStream)
-          }
+          completeBroadcast(myPeerId)
         }
 
         // Store this peer connection in RoomyPeerConnection map
-        roomyPcs[newPeerId] = pc;
+        let recvKey = newPeerId + "to" + myPeerId
+        roomyPcs[recvKey] = recvBroadcastPc;
 
         // Setup handlers for when we receive data back on this peer connection.
-        pc.ontrack = function(event) {
+        recvBroadcastPc.ontrack = function(event) {
           let fromUserId = newPeerId.split("-")[1];
           if (event.streams.length > 0 && fromUserId >= 0) {
             console.log('setting up media for userId=%o', fromUserId)
@@ -115,7 +169,7 @@ function App(props) {
 
         // Setup handler to monitor ICE candidates we can use on the peer
         // connection.
-        pc.onicecandidate = function(event) {
+        recvBroadcastPc.onicecandidate = function(event) {
           console.log('received ICE candidate from newPeerId=%o', newPeerId)
           console.log(event)
         }
@@ -124,10 +178,10 @@ function App(props) {
         // description of the peer connection, emit the 'ReceiveMediaFrom'
         // event using the SDP.
         console.log('creating offer..')
-        pc.createOffer(
+        recvBroadcastPc.createOffer(
           function(localDescription) {
             console.log('set local description for newPeerId=%o', newPeerId)
-            pc.setLocalDescription(localDescription,
+            recvBroadcastPc.setLocalDescription(localDescription,
             function() {
               // With the local description, we can send the event. We will
               // await a 'ReceiveMediaAnswer' event and set the remote
@@ -135,7 +189,7 @@ function App(props) {
               let data = {
                 'from_peer_id': newPeerId,
                 'to_peer_id':   myPeerId,
-                'desc':         btoa(JSON.stringify(pc.localDescription))
+                'desc':         btoa(JSON.stringify(recvBroadcastPc.localDescription))
               }
               rmsClient.receiveMediaFrom(data, () => {
                 console.log('peerId=%o requested to receive media from peerId=%o', myPeerId, newPeerId);
@@ -145,7 +199,7 @@ function App(props) {
                   let sdpAnswer = JSON.parse(atob(resp["sdp_answer"]));
                   if (sdpAnswer !== '') {
                     var remoteDescription = new RTCSessionDescription(sdpAnswer);
-                    var tmp = pc.setRemoteDescription(remoteDescription,
+                    var tmp = recvBroadcastPc.setRemoteDescription(remoteDescription,
                     function() {
                       console.log('set remote description for peerId=%o', newPeerId);
                     }, function (e) {

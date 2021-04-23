@@ -32,6 +32,7 @@ func (r *RoomzMediaServer) routes() {
   r.SioServer.OnDisconnect("/", r.disconnectHandler)
   r.SioServer.OnEvent("/", "JoinMediaRoom", r.joinMediaRoomHandler)
   r.SioServer.OnEvent("/", "ReceiveMediaFrom", r.receiveMediaFromHandler)
+  r.SioServer.OnEvent("/", "CompleteBroadcastOffer", r.completeBroadcastOfferHandler)
   r.SioServer.OnEvent("/", "LeaveMediaRoom", r.leaveMediaRoomHandler)
   r.SioServer.OnEvent("/", "OnIceCandidate", r.onIceCandidateHandler)
 }
@@ -76,13 +77,18 @@ func (r *RoomzMediaServer) joinMediaRoomHandler(s socketio.Conn, data map[string
   mediaMgr := room.GetMediaManager()
   log.Printf("Starting broadcast for userId: %v", userId)
   mediaMgr.StartBroastcast(userId)
+
+  // Before the user joins the room, emit the userId's of all current
+  // RoomUsers.
+  log.Printf("Emitting \"ExistingMediaRoomiez\" to userId: %v", userId)
+  room.SendExistingRoomiez(r.SioServer, userId, s.ID())
+
   room.Join(userId, s.ID())
 
+  // Tell all RoomUsers (including the new roomy) that a new roomy
+  // has arrived.
   log.Printf("Emitting \"NewMediaRoomyArrived\" to roomId: %v for userId: %v", roomId, userId)
   room.BroadcastNewRoomyArrived(r.SioServer, userId)
-
-  log.Printf("Emitting \"ExistingMediaRoomiez\" to userId: %v", userId)
-  room.SendExistingRoomiez(r.SioServer, userId)
 }
 
 func (r *RoomzMediaServer) receiveMediaFromHandler(s socketio.Conn, data map[string]interface{}) {
@@ -112,17 +118,6 @@ func (r *RoomzMediaServer) receiveMediaFromHandler(s socketio.Conn, data map[str
   room := r.roomMgr.GetRoom(roomId64)
   mediaMgr := room.GetMediaManager()
   var sdpAnswer string
-
-  // If requesting to receive media from themselves, they must first complete
-  // the offer/answer process on the broadcast pc.
-  if fromPeerId == toPeerId {
-    log.Printf("Completing broadcast for peerId: %v", fromPeerId)
-    sdpAnswer, err = mediaMgr.CompleteBroadcast(fromPeerId, sdpOffer)
-    if err != nil {
-      log.Printf("Completing broadcast failed, err=%v", err)
-      return
-    }
-  }
   // Create a RecvBroadcast Pc and send its sdpAnswer to the RFE.
   sdpAnswer, err = mediaMgr.RecvBroastcast(toPeerId, fromPeerId, sdpOffer)
   if err != nil {
@@ -130,10 +125,42 @@ func (r *RoomzMediaServer) receiveMediaFromHandler(s socketio.Conn, data map[str
     return
   }
   r.SioServer.BroadcastToRoom("/", s.ID(), "ReceiveMediaAnswer", map[string]interface{}{
-    "fromPeerId": fromPeerId,
+    "from_peer_id": fromPeerId,
     "sdp_answer": sdpAnswer,
   })
   log.Printf("peerId: %v receiving broadcast from peerId: %v", toPeerId, fromPeerId)
+}
+
+func (r *RoomzMediaServer) completeBroadcastOfferHandler(s socketio.Conn, data map[string]interface{}) {
+  log.Printf(":CompleteBroadcastOffer: received data=%v", data)
+  // NOTE: peer ID's follow the format: <room_id>-<user_id>
+  peerId, ok := data["peer_id"].(string)
+  if !ok {
+    log.Printf("invalid peer_id")
+    return
+  }
+  sdpOffer, ok := data["desc"].(string)
+  if !ok {
+    log.Printf("no sdpOffer")
+    return
+  }
+  roomId := strings.Split(peerId, "-")[0]
+  roomId64, err := strconv.ParseInt(roomId, 10, 64)
+  if err != nil {
+    log.Printf("could not parse peer_id correctly")
+    return
+  }
+  room := r.roomMgr.GetRoom(roomId64)
+  mediaMgr := room.GetMediaManager()
+  sdpAnswer, err := mediaMgr.CompleteBroadcast(peerId, sdpOffer)
+  if err != nil {
+    log.Printf("Completing broadcast failed for peerId: %v, err=%v", peerId, err)
+    return
+  }
+  r.SioServer.BroadcastToRoom("/", s.ID(), "CompleteBroadcastAnswer", map[string]interface{}{
+    "peer_id": peerId,
+    "sdp_answer": sdpAnswer,
+  })
 }
 
 func (r *RoomzMediaServer) leaveMediaRoomHandler(s socketio.Conn, data map[string]interface{}) {

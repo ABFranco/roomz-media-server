@@ -20,7 +20,9 @@ async function askToConnect() {
 
 const events = {
   JOIN_MEDIA_ROOM: 'JoinMediaRoom',
+  COMPLETE_BROADCAST_OFFER: 'CompleteBroadcastOffer',
   RECEIVE_MEDIA_FROM: 'ReceiveMediaFrom',
+  COMPLETE_BROADCAST_ANSWER: 'CompleteBroadcastAnswer',
   EXISTING_MEDIA_ROOMIEZ: 'ExistingMediaRoomiez',
   NEW_MEDIA_ROOMY_ARRIVED: 'NewMediaRoomyArrived',
   RECEIVE_MEDIA_ANSWER: 'ReceiveMediaAnswer',
@@ -40,10 +42,24 @@ function joinMediaRoom(data, cb) {
   cb()
 }
 
+function completeBroadcastOffer(data, cb) {
+  console.log(':rms.completeBroadcastOffer: Sending request to complete broadcast, data=%o', data)
+  rmsClientSocket.emit(events.COMPLETE_BROADCAST_OFFER, data);
+  cb()
+}
+
 function receiveMediaFrom(data, cb) {
   console.log(':rms.receiveMediaFrom: Sending request to join media room, data=%o', data)
   rmsClientSocket.emit(events.RECEIVE_MEDIA_FROM, data);
   cb()
+}
+
+function awaitCompleteBroadcastAnswer(cb) {
+  rmsClientSocket.on(events.COMPLETE_BROADCAST_ANSWER, (resp) => {
+    console.log(':sio.awaitCompleteBroadcastAnswer: Recevied response=%o', resp)
+    cb(resp)
+    rmsClientSocket.off(events.COMPLETE_BROADCAST_ANSWER)
+  })
 }
 
 function awaitExistingMediaRoomiez(cb) {
@@ -74,7 +90,9 @@ export {
   rmsClientSocket,
   askToConnect,
   joinMediaRoom,
+  completeBroadcastOffer,
   receiveMediaFrom,
+  awaitCompleteBroadcastAnswer,
   awaitExistingMediaRoomiez,
   awaitNewMediaRoomyArrived,
   awaitReceiveMediaAnswer,

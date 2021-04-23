@@ -65,17 +65,16 @@ func (r *Room) BroadcastRoomyLeft(server *socketio.Server, userId int64) {
   }
 }
 
-func (r *Room) SendExistingRoomiez(server *socketio.Server, userId int64) {
+func (r *Room) SendExistingRoomiez(server *socketio.Server, userId int64, sId string) {
   var peerIds []string
   for _, roomUser := range r.roomies {
     peerIds = append(peerIds, fmt.Sprintf("%v-%v", r.roomId, roomUser.userId))
   }
-  for _, roomUser := range r.roomies {
-    log.Printf("Sending \"ExistingMediaRoomiez\" to userId: %v", roomUser.userId)
-    server.BroadcastToRoom("/", roomUser.sId, "ExistingMediaRoomiez", map[string]interface{}{
-      "peer_ids": peerIds,
-    })
-  }
+  peerId := fmt.Sprintf("%v-%v", r.roomId, userId)
+  log.Printf("Sending \"ExistingMediaRoomiez\" to peerId: %v", peerId)
+  server.BroadcastToRoom("/", sId, "ExistingMediaRoomiez", map[string]interface{}{
+    "peer_ids": peerIds,
+  })
 }
 
 func (r *Room) GetRoomiez() []int64 {

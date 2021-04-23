@@ -234,6 +234,7 @@ func (r *RoomMediaManager) RecvBroastcast(toPeerId, fromPeerId, sdpOffer string)
       }
     })
   }()
+  // TODO: save RecvBroadcast pc in MediaMgr map.
   return localDesc, nil
 }
 
