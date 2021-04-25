@@ -76,16 +76,17 @@ func (r *RoomMediaManager) StartBroastcast(userId int64) {
     // audio/video track channel.
     var localVideoTrack *webrtc.TrackLocalStaticRTP
     var localAudioTrack *webrtc.TrackLocalStaticRTP
+    var newTrackErr error
     if remoteTrack.Codec().MimeType == "video/VP8" {
       log.Printf("Creating new local video track for userId: %v", userId)
-      localVideoTrack, newTrackErr := webrtc.NewTrackLocalStaticRTP(remoteTrack.Codec().RTPCodecCapability, "video", "pion")
+      localVideoTrack, newTrackErr = webrtc.NewTrackLocalStaticRTP(remoteTrack.Codec().RTPCodecCapability, "video", "pion")
       if newTrackErr != nil {
         log.Printf("Error creating new local track for userId: %v", userId)
       }
       videoTrackChan <- localVideoTrack
     } else {
       log.Printf("Creating new local audio track for userId: %v", userId)
-      localAudioTrack, newTrackErr := webrtc.NewTrackLocalStaticRTP(remoteTrack.Codec().RTPCodecCapability, "audio", "pion")
+      localAudioTrack, newTrackErr = webrtc.NewTrackLocalStaticRTP(remoteTrack.Codec().RTPCodecCapability, "audio", "pion")
       if newTrackErr != nil {
         log.Printf("Error creating new local track for userId: %v", userId)
       }
@@ -105,14 +106,21 @@ func (r *RoomMediaManager) StartBroastcast(userId int64) {
         }
   
         // TODO(hridayesh): Spatial-Audio Filters.
-        log.Printf("got data")
         if remoteTrack.Codec().MimeType == "video/VP8" {
-          if _, err = localVideoTrack.Write(rtpBuf[:i]); err != nil && !errors.Is(err, io.ErrClosedPipe) {
-            log.Printf("write error for userId: %v", userId)
+          if localVideoTrack != nil {
+            if _, err = localVideoTrack.Write(rtpBuf[:i]); err != nil && !errors.Is(err, io.ErrClosedPipe) {
+              log.Printf("write error for userId: %v", userId)
+            }
+          } else {
+            log.Printf("localVideoTrack is nil!")
           }
         } else {
-          if _, err = localAudioTrack.Write(rtpBuf[:i]); err != nil && !errors.Is(err, io.ErrClosedPipe) {
-            log.Printf("write error for userId: %v", userId)
+          if localAudioTrack != nil {
+            if _, err = localAudioTrack.Write(rtpBuf[:i]); err != nil && !errors.Is(err, io.ErrClosedPipe) {
+              log.Printf("write error for userId: %v", userId)
+            }
+          } else {
+            log.Printf("localAudioTrack is nil!")
           }
         }
       }
@@ -173,9 +181,11 @@ func (r *RoomMediaManager) RecvBroastcast(toPeerId, fromPeerId, sdpOffer string)
   fromAudioChannel := r.broadcastAudioChannels[fromUserId]
   fromVideoChannel := r.broadcastVideoChannels[fromUserId]
   // I'm interested to see how this would work when I do the mute experiment.
+  log.Printf("peerId:%v receiving audio/video tracks from peerId:%v", toPeerId, fromPeerId)
   fromAudioTrack := <- fromAudioChannel
   fromVideoTrack := <- fromVideoChannel
   
+  log.Printf("Creating RecvBroadcast pc for peerId:%v from peerId:%v", toPeerId, fromPeerId)
   recvBroadcastPc, err := rwebrtc.NewRoomzPeerConnection()
   if err != nil {
     return "", err
@@ -202,8 +212,9 @@ func (r *RoomMediaManager) RecvBroastcast(toPeerId, fromPeerId, sdpOffer string)
   offer := webrtc.SessionDescription{}
   signal.Decode(sdpOffer, &offer)
   err = recvBroadcastPc.SetRemoteDescription(offer)
+  log.Printf("Set remote description - recvbroadcast")
   if err != nil {
-    log.Printf("Failed to set remote description.")
+    log.Printf("Failed to set remote description. err=%v", err)
     return "", nil
   }
   sdpAnswer, err := recvBroadcastPc.CreateAnswer(nil)
@@ -211,6 +222,7 @@ func (r *RoomMediaManager) RecvBroastcast(toPeerId, fromPeerId, sdpOffer string)
     log.Printf("Failed to create answer on recvBroadcast peer connection.")
     return "", nil
   }
+  log.Printf("sdpAnswer:%v recvbroadcast", sdpAnswer)
   gatherComplete := webrtc.GatheringCompletePromise(recvBroadcastPc)
   err = recvBroadcastPc.SetLocalDescription(sdpAnswer)
   if err != nil {
@@ -234,6 +246,7 @@ func (r *RoomMediaManager) RecvBroastcast(toPeerId, fromPeerId, sdpOffer string)
       }
     })
   }()
+  log.Printf("local desc: %v recvBroadcast", localDesc)
   // TODO: save RecvBroadcast pc in MediaMgr map.
   return localDesc, nil
 }
