@@ -134,7 +134,7 @@ func (r *RoomMediaManager) StartBroastcast(userId int64) {
 }
 
 func (r *RoomMediaManager) CompleteBroadcast(peerId, sdpOffer string) (string, error) {
-  pc, ok := r.pcs[fmt.Sprintf(peerId)]
+  pc, ok := r.pcs[peerId]
   if !ok {
     return "", errors.New("cannot find user peer connection to complete broadcast for")
   }
